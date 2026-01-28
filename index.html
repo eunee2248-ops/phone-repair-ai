@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 휴대폰 수리비 분석기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap');
+    body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; color: #1e293b; }
+    .card { background: white; border-radius: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+    .loading-shimmer {
+      background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  </style>
+</head>
+
+<body class="min-h-screen p-4 md:p-8">
+  <div class="max-w-4xl mx-auto">
+    <header class="mb-10 text-center">
+      <h1 class="text-3xl font-extrabold mb-2 text-blue-600">휴대폰 수리비 및 부품 분석기</h1>
+      <p class="text-slate-500">기종과 증상을 입력하시면 AI가 예상 비용과 상세 부품 명세를 분석해 드립니다.</p>
+    </header>
+
+    <div class="card p-6 mb-8">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">휴대폰 기종</label>
+          <input id="model-input" type="text" placeholder="예: 아이폰 15 프로, 갤럭시 S24"
+                 class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-slate-700 mb-1">고장 증상</label>
+          <input id="symptom-input" type="text" placeholder="예: 액정 파손, 배터리 소모, 충전 단자 고장"
+                 class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+        </div>
+      </div>
+      <button id="analyze-btn"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors">
+        상세 분석 시작
+      </button>
+      <p class="text-xs text-slate-400 mt-3">
+        ※ 정상 실행이 안 되면 파일 더블클릭(file://) 대신 로컬 서버로 실행해 주십시오.
+      </p>
+    </div>
+
+    <div id="result-container" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="card p-6 border-t-4 border-blue-500">
+          <h2 class="text-lg font-bold text-blue-600 mb-2">공식 서비스 센터</h2>
+          <div id="official-price" class="text-3xl font-black mb-4 text-slate-800">--- 원</div>
+          <ul class="text-sm text-slate-600 space-y-2">
+            <li>· 제조사 정품 어셈블리 사용 보장</li>
+            <li>· 공식 워런티(보증) 혜택 유지</li>
+            <li>· 공인 기술자의 표준화된 수리 공정</li>
+          </ul>
+        </div>
+
+        <div class="card p-6 border-t-4 border-emerald-500">
+          <h2 class="text-lg font-bold text-emerald-600 mb-2">사설 수리점 (평균)</h2>
+          <div id="private-price" class="text-3xl font-black mb-4 text-slate-800">--- 원</div>
+          <ul class="text-sm text-slate-600 space-y-2">
+            <li>· 추출 부품 또는 호환용 부품 선택 가능</li>
+            <li>· 당일 즉시 수리 및 부분 수리 가능</li>
+            <li>· 정밀 현미경 등을 활용한 메인보드 수리</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card p-8">
+        <h3 class="text-xl font-bold mb-4 border-b pb-2">상세 부품 명세 및 분석</h3>
+        <div class="overflow-x-auto mb-6">
+          <table class="w-full text-sm text-left border-collapse">
+            <thead>
+            <tr class="bg-slate-50">
+              <th class="p-3 border-b font-bold text-slate-700">부품명</th>
+              <th class="p-3 border-b font-bold text-slate-700">역할 및 기능</th>
+              <th class="p-3 border-b font-bold text-slate-700">부품 특성</th>
+            </tr>
+            </thead>
+            <tbody id="parts-table-body"></tbody>
+          </table>
+        </div>
+        <div id="analysis-text" class="text-slate-700 leading-relaxed space-y-4">
+          데이터를 불러오는 중입니다...
+        </div>
+      </div>
+
+      <div class="bg-blue-50 p-6 rounded-3xl border border-blue-100">
+        <h3 class="text-sm font-bold text-blue-800 mb-3 uppercase tracking-wider">주요 용어 설명</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-blue-900/80">
+          <div>
+            <strong class="block mb-1">디지타이저</strong>
+            화면의 터치를 감지하여 전기적 신호로 바꾸는 센서 층입니다.
+          </div>
+          <div>
+            <strong class="block mb-1">어셈블리</strong>
+            관련된 여러 하위 부품들이 미리 조립된 일체형 모듈입니다.
+          </div>
+          <div>
+            <strong class="block mb-1">BMS</strong>
+            배터리의 충방전 상태를 제어하여 과충전이나 폭발을 방지하는 시스템입니다.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading-state" class="hidden space-y-6">
+      <div class="loading-shimmer h-48 w-full rounded-3xl"></div>
+      <div class="loading-shimmer h-64 w-full rounded-3xl"></div>
+    </div>
+  </div>
+<script>
+const modelInput = document.getElementById("model-input");
+const symptomInput = document.getElementById("symptom-input");
+const analyzeBtn = document.getElementById("analyze-btn");
+const resultContainer = document.getElementById("result-container");
+const loadingState = document.getElementById("loading-state");
+
+// 서버 호출 함수
+async function fetchRepairData(model, symptom) {
+ const response = await fetch("/api/analyze", {
+  method: "POST",
+  headers: { "Content-Type": "application/json","x-app-key": "pipoxh_1212_0705"
+ },
+  body: JSON.stringify({ model, symptom })
+});
+ 
+
+  if (!response.ok) {
+    const t = await response.text();
+    throw new Error(`서버 요청 실패: ${response.status}\n${t}`);
+  }
+
+  const raw = await response.json();
+  const text = raw?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) return raw;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      officialPrice: "-",
+      privatePrice: "-",
+      analysis: text,
+      detailedParts: [],
+      time: "-"
+    };
+  }
+}
+
+// 버튼 클릭
+analyzeBtn.onclick = async () => {
+  const model = modelInput.value.trim();
+  const symptom = symptomInput.value.trim();
+
+  if (!model || !symptom) {
+    alert("기종과 증상을 모두 입력해 주십시오.");
+    return;
+  }
+
+  // 로딩 UI
+  resultContainer.classList.add("hidden");
+  loadingState.classList.remove("hidden");
+  analyzeBtn.disabled = true;
+  analyzeBtn.textContent = "분석 중입니다...";
+
+  try {
+    const data = await fetchRepairData(model, symptom);
+    console.log("결과:", data);
+    if (data?.error) {
+    console.error("서버 에러:", data);
+    alert(`분석 실패: ${data.code ?? ""} ${data.error}`);
+    return;
+  }
+
+    // ✅ 화면에 결과 반영
+ 
+document.getElementById("official-price").textContent = (data.officialPrice ?? "-") + " 원";
+document.getElementById("private-price").textContent  = (data.privatePrice  ?? "-") + " 원";
+
+const tableBody = document.getElementById("parts-table-body");
+tableBody.innerHTML = "";
+
+(data.detailedParts ?? []).forEach(part => {
+  tableBody.insertAdjacentHTML("beforeend",
+    `<tr><td class="p-3 border-b text-blue-600 font-semibold">${part.name ?? "-"}</td>
+     <td class="p-3 border-b text-slate-600">${part.role ?? "-"}</td>
+     <td class="p-3 border-b text-slate-500 italic">${part.trait ?? "-"}</td></tr>`);
+});
+
+
+    document.getElementById("analysis-text").innerHTML = `
+      <p class="font-semibold text-blue-800">종합 진단:</p>
+      <p>${data.analysis ?? "-"}</p>
+      <p class="mt-2"><strong>수리 예상 소요 시간:</strong> ${data.time ?? "-"}</p>
+      <p class="text-xs text-slate-400 mt-6 border-t pt-4">
+        ※ 비용과 부품은 상황에 따라 달라질 수 있습니다.
+      </p>
+    `;
+
+    // ✅ 결과 영역 표시
+    loadingState.classList.add("hidden");
+    resultContainer.classList.remove("hidden");
+  } catch (err) {
+    console.error(err);
+    loadingState.classList.add("hidden");
+    alert("분석 실패. 콘솔을 확인해 주십시오.");
+  } finally {
+    analyzeBtn.disabled = false;
+    analyzeBtn.textContent = "상세 분석 시작";
+  }
+};
+
+</script>  
+</body>
+</html>
